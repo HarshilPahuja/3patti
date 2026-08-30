@@ -1,4 +1,4 @@
-// Teen Patti Bankroll Manager Logic
+// Alpha Gambles Bankroll Manager Logic
 
 // State management
 let state = {

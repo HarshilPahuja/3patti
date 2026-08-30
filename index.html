@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teen Patti Bankroll Manager</title>
+  <title>Alpha Gambles - Bankroll Manager</title>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,19 +16,23 @@
     <header class="app-header">
       <div class="logo-area">
         <span class="logo-icon">♣</span>
-        <h1>Teen Patti <span class="accent-text">Bankroll</span></h1>
+        <h1>Alpha <span class="accent-text">Gambles</span></h1>
       </div>
       <div class="system-status-bar" id="statusBar" style="display: none;">
-        <div class="status-indicator">
-          <span class="status-dot green"></span>
-          <span id="statusText">ACTIVE</span>
+        <div class="status-summary">
+          <div class="status-indicator">
+            <span class="status-dot green"></span>
+            <span id="statusText">ACTIVE</span>
+          </div>
+          <div class="status-stat">
+            <span class="label">System Total:</span>
+            <span class="value" id="systemTotal">₹0</span>
+          </div>
         </div>
-        <div class="status-stat">
-          <span class="label">System Total:</span>
-          <span class="value" id="systemTotal">₹0</span>
+        <div class="status-actions">
+          <button id="btnAdminAddHeader" class="btn btn-gold btn-sm" onclick="openAdminAddMoneyModal()">💰 Admin Add</button>
+          <button id="btnNewGameHeader" class="btn btn-outline btn-sm">New Game</button>
         </div>
-        <button id="btnAdminAddHeader" class="btn btn-gold btn-sm" onclick="openAdminAddMoneyModal()">💰 Admin Add Money</button>
-        <button id="btnNewGameHeader" class="btn btn-outline btn-sm">New Game</button>
       </div>
     </header>
 
@@ -37,7 +41,7 @@
       <section id="setupScreen" class="setup-card glass-panel">
         <div class="panel-header">
           <h2>Game Setup</h2>
-          <p class="subtitle">Initialize your Teen Patti session bankroll</p>
+          <p class="subtitle">Initialize your Alpha Gambles session bankroll</p>
         </div>
 
         <form id="setupForm" onsubmit="event.preventDefault();">
