@@ -212,6 +212,29 @@
                 </table>
               </div>
             </div>
+
+            <!-- Win History Log -->
+            <div class="action-card glass-panel ledger-card" style="margin-top: 1rem;">
+              <div class="card-header">
+                <h3>🏆 Win History</h3>
+                <button class="btn btn-xs btn-outline" onclick="clearWinHistoryDb()">Clear History</button>
+              </div>
+              <div class="ledger-body">
+                <table class="ledger-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 70px;">Sr No.</th>
+                      <th>Winner</th>
+                      <th>Winning Prize</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="winHistoryBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -318,6 +341,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

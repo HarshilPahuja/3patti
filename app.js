@@ -28,6 +28,7 @@ const bootAmountInput = document.getElementById('bootAmount');
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
   loadGame();
+  initSqliteDb();
   if (state.status === 'SETUP') {
     renderPlayerInputs();
   } else {
@@ -371,6 +372,9 @@ function refreshUI() {
   // Render ledger list
   renderLedger();
 
+  // Render SQLite win history
+  renderWinHistory();
+
   // Highlight balance changes
   if (lastBalances) {
     highlightChanges(derived, lastBalances);
@@ -383,7 +387,16 @@ function renderPlayerCards(derived, potInfo) {
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
 
-  state.players.forEach(name => {
+  const sortedPlayers = [...state.players].sort((a, b) => {
+    const balA = derived.players[a] ?? 0;
+    const balB = derived.players[b] ?? 0;
+    if (balB !== balA) {
+      return balB - balA;
+    }
+    return a.localeCompare(b);
+  });
+
+  sortedPlayers.forEach(name => {
     const bal = derived.players[name];
     const card = document.createElement('div');
     card.className = `player-card glass-panel`;
@@ -602,6 +615,9 @@ function awardPotToWinner() {
       reason: `Round ${currentRoundNum} Winner: ${winner}`,
       groupId
     });
+
+    // Record win in SQLite DB
+    recordWinToDb(winner, potInfo.totalPot);
 
     state.roundsCount++;
 
@@ -888,3 +904,164 @@ window.onclick = function(event) {
     }
   });
 };
+
+// ==========================================
+// SQLITE DATABASE INTEGRATION (WIN HISTORY)
+// ==========================================
+let sqliteDb = null;
+let sqlJsPromise = null;
+
+// Initialize SQLite database instance
+async function initSqliteDb() {
+  if (sqliteDb) return sqliteDb;
+  if (!sqlJsPromise) {
+    sqlJsPromise = (async () => {
+      try {
+        if (typeof initSqlJs !== 'function') {
+          console.warn("sql.js is loading or unavailable.");
+          return null;
+        }
+        const SQL = await initSqlJs({
+          locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        });
+
+        // Load saved DB from localStorage or create new in-memory SQLite DB
+        const savedDb = localStorage.getItem('alpha_gambles_sqlite_win_history');
+        if (savedDb) {
+          try {
+            const uInt8Array = new Uint8Array(JSON.parse(savedDb));
+            sqliteDb = new SQL.Database(uInt8Array);
+          } catch (e) {
+            console.warn("Failed to load saved SQLite DB; starting fresh:", e);
+            sqliteDb = new SQL.Database();
+          }
+        } else {
+          sqliteDb = new SQL.Database();
+        }
+
+        // Schema with columns: sr_no, name (player name), timestamp, overall_winning_prize
+        sqliteDb.run(`
+          CREATE TABLE IF NOT EXISTS win_history (
+            sr_no INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            overall_winning_prize REAL NOT NULL
+          );
+        `);
+
+        persistSqliteDb();
+        renderWinHistory();
+        return sqliteDb;
+      } catch (err) {
+        console.error("SQLite initialization error:", err);
+        return null;
+      }
+    })();
+  }
+  return sqlJsPromise;
+}
+
+// Persist SQLite DB to browser storage
+function persistSqliteDb() {
+  if (!sqliteDb) return;
+  try {
+    const data = sqliteDb.export();
+    localStorage.setItem('alpha_gambles_sqlite_win_history', JSON.stringify(Array.from(data)));
+  } catch (err) {
+    console.error("Failed to persist SQLite DB:", err);
+  }
+}
+
+// Insert win record into SQLite
+async function recordWinToDb(name, overallPrize, timestamp = new Date().toISOString()) {
+  await initSqliteDb();
+  if (!sqliteDb) return;
+
+  try {
+    const stmt = sqliteDb.prepare("INSERT INTO win_history (name, timestamp, overall_winning_prize) VALUES (?, ?, ?);");
+    stmt.run([name, timestamp, Number(overallPrize)]);
+    stmt.free();
+    persistSqliteDb();
+    renderWinHistory();
+  } catch (err) {
+    console.error("Failed to insert win into SQLite:", err);
+  }
+}
+
+// Query win history from SQLite database
+function queryWinHistory() {
+  if (!sqliteDb) return [];
+  try {
+    const res = sqliteDb.exec("SELECT sr_no, name, timestamp, overall_winning_prize FROM win_history ORDER BY sr_no DESC;");
+    if (!res || res.length === 0) return [];
+    const columns = res[0].columns;
+    const values = res[0].values;
+    return values.map(row => {
+      const obj = {};
+      columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+  } catch (err) {
+    console.error("Failed to query SQLite win_history:", err);
+    return [];
+  }
+}
+
+// Clear Win History
+function clearWinHistoryDb() {
+  if (!confirm("Are you sure you want to clear all Win History records?")) return;
+  if (!sqliteDb) return;
+  try {
+    sqliteDb.run("DELETE FROM win_history;");
+    persistSqliteDb();
+    renderWinHistory();
+  } catch (err) {
+    alert("Error clearing win history: " + err.message);
+  }
+}
+
+// Render win history to UI table
+function renderWinHistory() {
+  const tbody = document.getElementById('winHistoryBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const rows = queryWinHistory();
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1rem;">No wins recorded yet</td></tr>`;
+    return;
+  }
+
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    const d = new Date(row.timestamp);
+    const timeStr = isNaN(d.getTime()) ? row.timestamp : (d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (' + d.toLocaleDateString() + ')');
+    tr.innerHTML = `
+      <td>#${row.sr_no}</td>
+      <td style="font-weight: 600; color: var(--accent-gold);">${row.name}</td>
+      <td class="col-amt font-highlight">₹${Number(row.overall_winning_prize).toLocaleString('en-IN')}</td>
+      <td style="color: var(--text-muted); font-size: 0.8rem;">${timeStr}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Direct SQL query execution interface available globally
+window.queryDb = function(sql, params = []) {
+  if (!sqliteDb) {
+    console.warn("SQLite DB is not initialized yet.");
+    return null;
+  }
+  try {
+    return sqliteDb.exec(sql, params);
+  } catch (err) {
+    console.error("SQL query execution error:", err);
+    return { error: err.message };
+  }
+};
+window.queryWinHistory = queryWinHistory;
+window.recordWinToDb = recordWinToDb;
+window.clearWinHistoryDb = clearWinHistoryDb;
+
