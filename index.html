@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teen Patti Bankroll Manager</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">♣</span>
+        <h1>Teen Patti <span class="accent-text">Bankroll</span></h1>
+      </div>
+      <div class="system-status-bar" id="statusBar" style="display: none;">
+        <div class="status-indicator">
+          <span class="status-dot green"></span>
+          <span id="statusText">ACTIVE</span>
+        </div>
+        <div class="status-stat">
+          <span class="label">System Total:</span>
+          <span class="value" id="systemTotal">₹0</span>
+        </div>
+        <button id="btnAdminAddHeader" class="btn btn-gold btn-sm" onclick="openAdminAddMoneyModal()">💰 Admin Add Money</button>
+        <button id="btnNewGameHeader" class="btn btn-outline btn-sm">New Game</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- 1. SETUP SCREEN -->
+      <section id="setupScreen" class="setup-card glass-panel">
+        <div class="panel-header">
+          <h2>Game Setup</h2>
+          <p class="subtitle">Initialize your Teen Patti session bankroll</p>
+        </div>
+
+        <form id="setupForm" onsubmit="event.preventDefault();">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="startingBalance">Starting Balance (₹)</label>
+              <input type="number" id="startingBalance" min="1" value="1000" required>
+            </div>
+            <div class="form-group">
+              <label for="bootAmount">Round Buy-in / Boot (₹)</label>
+              <input type="number" id="bootAmount" min="1" value="100" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="playerCount">Number of Players</label>
+            <div class="counter-input">
+              <button type="button" onclick="adjustPlayerCount(-1)">−</button>
+              <input type="number" id="playerCount" min="2" max="10" value="4" readonly>
+              <button type="button" onclick="adjustPlayerCount(1)">+</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Player Names</label>
+            <div id="playerNamesContainer" class="names-list">
+              <!-- Dynamically generated inputs -->
+            </div>
+          </div>
+
+          <button type="submit" id="btnStartGame" class="btn btn-primary btn-block">Initialize Session</button>
+        </form>
+      </section>
+
+      <!-- 2. GAMEPLAY DASHBOARD -->
+      <div id="gameplayDashboard" style="display: none;">
+        <!-- Top metrics row -->
+        <div class="metrics-grid">
+          <!-- Central Bank Card -->
+          <div class="metric-card bank-card glass-panel">
+            <div class="card-icon">🏛️</div>
+            <div class="card-info">
+              <span class="card-label">Central Bank Balance</span>
+              <span class="card-value font-highlight" id="bankBalance">₹0</span>
+            </div>
+          </div>
+
+          <!-- Current Round Pot Card -->
+          <div class="metric-card pot-card glass-panel">
+            <div class="card-icon">💰</div>
+            <div class="card-info">
+              <span class="card-label" id="currentRoundLabel">Round 1 Pot</span>
+              <span class="card-value text-gold" id="currentPotDisplay">₹0</span>
+            </div>
+            <div class="pot-breakdown" id="potBreakdown">
+              <span>Boot: <b id="potBootAmt">₹0</b></span> | <span>Hits: <b id="potHitsAmt">₹0</b></span>
+            </div>
+          </div>
+
+          <!-- Total Active Players -->
+          <div class="metric-card stat-card glass-panel">
+            <div class="card-icon">👥</div>
+            <div class="card-info">
+              <span class="card-label">Active Players</span>
+              <span class="card-value" id="activePlayersCount">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Workspace split -->
+        <div class="workspace-grid">
+          <!-- Left side: Players list -->
+          <div class="players-section">
+            <div class="section-header">
+              <h3>Players Ledger</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-xs btn-gold" onclick="openAdminAddMoneyModal()">+ Add Money</button>
+                <button class="btn btn-xs btn-outline" onclick="openDirectTransferModal()">Direct Transfer</button>
+              </div>
+            </div>
+            <div class="players-grid" id="playersGrid">
+              <!-- Dynamically populated cards -->
+            </div>
+          </div>
+
+          <!-- Right side: Game Actions and History -->
+          <div class="actions-section">
+            <!-- Round Manager: Boot & Pitch Hits Widget -->
+            <div class="action-card glass-panel round-manager-card">
+              <div class="card-header">
+                <h3>Round Action Center</h3>
+                <span class="badge badge-primary" id="roundBadge">Round 1</span>
+              </div>
+              <div class="card-body">
+                <!-- Step 1: One-Click Boot / Initial Buy-in Collection -->
+                <div class="round-step-box">
+                  <div class="step-title">
+                    <span class="step-num">1</span>
+                    <h4>Initial Buy-in / Boot (Ante)</h4>
+                  </div>
+                  <div class="boot-controls">
+                    <div class="boot-input-group">
+                      <label for="roundBootInput">Boot (₹):</label>
+                      <input type="number" id="roundBootInput" min="1" class="boot-input" oninput="updateBootButtonText()">
+                    </div>
+                    <button id="btnCollectBoot" class="btn btn-gold btn-block" onclick="collectBootFromAll()">
+                      ⚡ Deduct Boot (₹100 from All) &rarr; Bank
+                    </button>
+                  </div>
+                  <div id="bootStatusMessage" class="step-status"></div>
+                </div>
+
+                <!-- Step 2: Pitch Hits (Chaal / Bets) -->
+                <div class="round-step-box">
+                  <div class="step-title">
+                    <span class="step-num">2</span>
+                    <h4>Pitch Hits / Bets into Pot</h4>
+                  </div>
+                  <div id="pitchHitsList" class="pitch-hits-container">
+                    <!-- Dynamic player hit pitching controls -->
+                  </div>
+                </div>
+
+                <!-- Step 3: Showdown / Award Pot -->
+                <div class="round-step-box">
+                  <div class="step-title">
+                    <span class="step-num">3</span>
+                    <h4>Declare Winner & Award Pot</h4>
+                  </div>
+                  <div id="allInNotice" class="allin-banner" style="display: none;">
+                    <!-- Dynamically shows if someone is all-in -->
+                  </div>
+                  <div class="award-pot-form">
+                    <div class="form-group mb-2">
+                      <label for="roundWinnerSelect">Select Winner</label>
+                      <select id="roundWinnerSelect" class="form-control">
+                        <!-- Populated dynamically -->
+                      </select>
+                    </div>
+                    <button class="btn btn-primary btn-block" id="btnAwardPot" onclick="awardPotToWinner()">
+                      🏆 Award Entire Pot to Winner
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ledger / Transactions Log -->
+            <div class="action-card glass-panel ledger-card">
+              <div class="card-header">
+                <h3>Transaction History</h3>
+                <button class="btn btn-xs btn-outline btn-warning" id="btnUndo" onclick="undoLastTransaction()" disabled>↩ Undo Last</button>
+              </div>
+              <div class="ledger-body">
+                <table class="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Amount</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ledgerHistory">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. GAME OVER SCREEN -->
+      <section id="gameOverScreen" class="game-over-card glass-panel" style="display: none;">
+        <div class="game-over-banner">
+          <div class="trophy-icon">🏆</div>
+          <h2>Game Over</h2>
+          <p class="subtitle" id="eliminationMessage">A player reached ₹0 balance.</p>
+        </div>
+
+        <div class="stats-reconciliation">
+          <h3>Session Summary</h3>
+          <div class="summary-stats-grid">
+            <div class="summary-stat-box">
+              <span class="label">Rounds</span>
+              <span class="value" id="summaryRounds">0</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="label">Total System Money</span>
+              <span class="value" id="summarySystemTotal">₹0</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="label">Bank Final Balance</span>
+              <span class="value" id="summaryBankFinal">₹0</span>
+            </div>
+            <div class="summary-stat-box">
+              <span class="label">Duration</span>
+              <span class="value" id="summaryDuration">0m</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-table-section">
+          <h3>Final Standings</h3>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Final Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="finalStandingsBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="game-over-actions">
+          <button class="btn btn-primary" onclick="restartSetup()">Start New Game</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Admin Add Money Modal (No Password) -->
+  <div class="modal" id="adminAddMoneyModal">
+    <div class="modal-content glass-panel">
+      <div class="modal-header">
+        <h3>💰 Admin Add Money</h3>
+        <button class="close-btn" onclick="closeAdminAddMoneyModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="adminTargetPlayer">Select Account</label>
+          <select id="adminTargetPlayer" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label for="adminAddAmount">Amount to Add (₹)</label>
+          <input type="number" id="adminAddAmount" min="1" value="500" placeholder="Enter amount">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitAdminAddMoney()">Confirm & Add Money</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Direct Transfer Modal -->
+  <div class="modal" id="transferModal">
+    <div class="modal-content glass-panel">
+      <div class="modal-header">
+        <h3>Direct Player-to-Player Transfer</h3>
+        <button class="close-btn" onclick="closeDirectTransferModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="transferSender">Sender Player (From)</label>
+          <select id="transferSender" class="form-control" onchange="filterTransferReceivers()"></select>
+        </div>
+        <div class="form-group">
+          <label for="transferReceiver">Receiver Player (To)</label>
+          <select id="transferReceiver" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label for="transferAmount">Amount (₹)</label>
+          <input type="number" id="transferAmount" min="1" placeholder="Enter amount">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitDirectTransfer()">Confirm P2P Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
